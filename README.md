@@ -1,93 +1,44 @@
-# 🚀 Hackathon Mobile App Starter
+# 🌤️ Weather Mobile App (React Native & Expo)
 
-Bộ khởi tạo ứng dụng di động hoàn chỉnh chuẩn bị cho **Hackathon**, tích hợp sẵn 4 công nghệ:
-- 📱 **React Native** (0.88+)
-- ⚡ **Expo** (SDK 58 + Expo Router file-based routing)
-- 🔷 **TypeScript** (Strict mode)
-- 🗄️ **Supabase** (Auth, PostgreSQL Database, Storage & Realtime)
+Ứng dụng xem dự báo thời tiết di động hiện đại, mượt mà được xây dựng với **React Native**, **Expo SDK 58**, **TypeScript** và **Open-Meteo API**.
+
+🔗 **GitHub Repository:** [tuannewbie-cos/weather-app-mobile](https://github.com/tuannewbie-cos/weather-app-mobile)
 
 ---
 
-## 🛠️ Yêu cầu môi trường
-- **Node.js**: v22 LTS (Đã được cài đặt qua `nvm`)
-- **NPM**: v10+
-- **Expo Go app** (tải miễn phí trên App Store cho iOS hoặc Google Play cho Android để quét mã chạy thử ngay trên điện thoại)
+## ✨ Tính năng nổi bật
+
+- 🌡️ **Thời tiết thời gian thực**: Nhiệt độ hiện tại, trạng thái thời tiết (nắng, mưa, mây, dông sét), nhiệt độ cảm giác (feels-like), nhiệt độ cao nhất & thấp nhất trong ngày.
+- ⏱️ **Dự báo 24 giờ tới**: Thanh cuộn ngang hiển thị chi tiết nhiệt độ, biểu tượng thời tiết và xác suất mưa theo từng giờ.
+- 📊 **4 chỉ số khí tượng chuyên sâu**: Độ ẩm (%), Tốc độ gió (km/h), Chỉ số tia cực tím (UV Index), Áp suất khí quyển (hPa).
+- 📅 **Dự báo 7 ngày tới**: Xem xu hướng thời tiết cả tuần kèm thanh nhiệt độ trực quan (Min - Max).
+- 🔍 **Tìm kiếm thành phố toàn cầu**: Tích hợp Geocoding API cho phép gõ tìm bất kỳ tỉnh thành nào tại Việt Nam hoặc thế giới.
+- ⚡ **Chuyển nhanh tỉnh thành phổ biến**: Các nút chọn nhanh Hà Nội, TP.HCM, Đà Nẵng, Hải Phòng, Đà Lạt, Sa Pa, Nha Trang, Cần Thơ, Tokyo, Seoul...
+- 💾 **Tự động lưu vị trí gần nhất**: Lưu vị trí bạn đã chọn bằng `AsyncStorage` để tự động tải lại trong các lần mở app sau.
+- 🔄 **Pull-to-Refresh**: Vuốt nhẹ từ trên xuống để cập nhật dữ liệu thời tiết mới nhất tức thì.
 
 ---
 
-## 🚀 Khởi chạy dự án (Quick Start)
+## 🚀 Cách chạy thử ứng dụng
 
-Trong terminal, tại thư mục dự án:
-
+### 1. Khởi động Dev Server
 ```bash
-# 1. Chạy Expo dev server
 npm start
 ```
 
-### Các tùy chọn mở app:
-- **Trên điện thoại thật (Khuyên dùng trong Hackathon)**:
-  - Mở ứng dụng **Expo Go** trên điện thoại (đảm bảo điện thoại và laptop cùng kết nối 1 mạng Wi-Fi).
-  - Quét mã QR hiển thị trên Terminal.
+### 2. Xem trực tiếp:
+- **Trên điện thoại thật (Khuyên dùng)**: 
+  - Tải app **Expo Go** trên App Store (iOS) hoặc CH Play (Android).
+  - Quét mã QR hiển thị trên màn hình Terminal để xem ứng dụng chạy ngay trên điện thoại.
 - **Trên trình duyệt Web**: Bấm phím `w` trong terminal hoặc chạy `npm run web`.
-- **Trên iOS Simulator** (nếu có Xcode): Bấm phím `i` trong terminal.
-- **Trên Android Emulator** (nếu có Android Studio): Bấm phím `a` trong terminal.
 
 ---
 
-## 🔑 Cấu hình Supabase
+## 🛠️ Công nghệ sử dụng
 
-1. Mở file [`.env`](file:///Users/dominhtuan/Downloads/test/.env).
-2. Điền thông tin dự án Supabase của bạn (Lấy tại **Supabase Dashboard** > **Project Settings** > **API**):
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-Client Supabase đã được khởi tạo sẵn tại [`lib/supabase.ts`](file:///Users/dominhtuan/Downloads/test/lib/supabase.ts), hỗ trợ lưu phiên đăng nhập tự động qua SecureStore (trên điện thoại) và LocalStorage (trên Web).
-
----
-
-## 📁 Cấu trúc thư mục
-
-```text
-├── app/                  # File-based routing (Expo Router)
-│   ├── (tabs)/           # Màn hình Navigation Tabs
-│   │   ├── index.tsx     # Tab 1: Màn hình giới thiệu stack & tính năng
-│   │   ├── two.tsx       # Tab 2: Demo đăng ký, đăng nhập Supabase Auth
-│   │   └── _layout.tsx   # Cấu hình thanh điều hướng Tabs
-│   ├── modal.tsx         # Modal popup mẫu
-│   └── _layout.tsx       # Root layout của toàn bộ app
-├── lib/
-│   └── supabase.ts       # Cấu hình Supabase Client & Auth Auto-refresh
-├── components/           # UI Components tái sử dụng
-├── constants/            # Màu sắc và theme
-├── .env                  # Biến môi trường Supabase (được gitignore)
-├── .env.example          # Mẫu biến môi trường
-└── package.json          # Thư viện & kịch bản lệnh
-```
-
----
-
-## 💡 Code Mẫu Sử Dụng Supabase
-
-### 1. Truy vấn dữ liệu (Query Data)
-```typescript
-import { supabase } from '@/lib/supabase';
-
-// Lấy danh sách bài viết từ bảng 'posts'
-const { data, error } = await supabase
-  .from('posts')
-  .select('*')
-  .order('created_at', { ascending: false });
-```
-
-### 2. Thêm dữ liệu (Insert Data)
-```typescript
-const { data, error } = await supabase
-  .from('posts')
-  .insert([{ title: 'Bài viết mới', content: 'Nội dung...' }]);
-```
-
-### 3. Đăng ký / Đăng nhập
-Tab **Supabase** (`app/(tabs)/two.tsx`) đã có sẵn form đăng ký, đăng nhập và hiển thị trạng thái tài khoản.
+- **Framework**: React Native 0.88 + Expo SDK 58
+- **Navigation**: Expo Router (File-based routing)
+- **Language**: TypeScript (Strict mode)
+- **Icons**: `@expo/vector-icons` (Ionicons, Feather, MaterialCommunityIcons)
+- **Data Source**: Open-Meteo Weather Forecast & Geocoding API (Không cần API key, dữ liệu chuẩn xác toàn cầu)
+- **Storage**: `@react-native-async-storage/async-storage`
