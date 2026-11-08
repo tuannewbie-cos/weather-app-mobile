@@ -51,13 +51,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Tab Two',
+          title: 'Supabase',
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
+                ios: 'cylinder.split.1x2',
+                android: 'storage',
+                web: 'storage',
               }}
               tintColor={color}
               size={28}
