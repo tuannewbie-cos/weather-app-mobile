@@ -1,165 +1,189 @@
-import { StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { Text, View } from '@/components/Themed';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+  View,
+  Text,
+  TouchableOpacity,
+  SafeAreaView,
+} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { City, WeatherData } from '@/types/weather';
+import { DEFAULT_CITIES } from '@/constants/cities';
+import { fetchWeatherData } from '@/services/weatherService';
+import { CurrentWeatherCard } from '@/components/weather/CurrentWeatherCard';
+import { WeatherMetricsGrid } from '@/components/weather/WeatherMetricsGrid';
+import { HourlyForecastList } from '@/components/weather/HourlyForecastList';
+import { DailyForecastList } from '@/components/weather/DailyForecastList';
+import { CitySearchModal } from '@/components/weather/CitySearchModal';
 
-export default function HomeScreen() {
-  const router = useRouter();
+const SELECTED_CITY_STORAGE_KEY = '@weather_selected_city';
 
-  const stacks = [
-    {
-      name: 'React Native',
-      badge: 'Mobile Core',
-      desc: 'Nền tảng build ứng dụng native đa nền tảng (iOS, Android, Web) bằng React.',
-      color: '#00D8FF',
-      url: 'https://reactnative.dev',
-    },
-    {
-      name: 'Expo',
-      badge: 'SDK 58',
-      desc: 'Hệ sinh thái công cụ phát triển nhanh, test trực tiếp qua Expo Go bằng mã QR.',
-      color: '#000000',
-      url: 'https://expo.dev',
-    },
-    {
-      name: 'TypeScript',
-      badge: 'Type Safety',
-      desc: 'Giúp code an toàn, tự động gợi ý code, hạn chế tối đa lỗi runtime trong hackathon.',
-      color: '#3178C6',
-      url: 'https://www.typescriptlang.org',
-    },
-    {
-      name: 'Supabase',
-      badge: 'Backend & DB',
-      desc: 'Cơ sở dữ liệu Postgres, Auth, Storage và Realtime API dựng sẵn chỉ trong vài phút.',
-      color: '#3ECF8E',
-      url: 'https://supabase.com',
-    },
-  ];
+export default function WeatherScreen() {
+  const [selectedCity, setSelectedCity] = useState<City>(DEFAULT_CITIES[0]);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+
+  // Load saved city on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(SELECTED_CITY_STORAGE_KEY);
+        if (saved) {
+          const parsed: City = JSON.parse(saved);
+          setSelectedCity(parsed);
+          loadWeather(parsed);
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not read saved city:', err);
+      }
+      loadWeather(DEFAULT_CITIES[0]);
+    })();
+  }, []);
+
+  const loadWeather = async (city: City) => {
+    try {
+      setError(null);
+      const data = await fetchWeatherData(city);
+      setWeatherData(data);
+    } catch (err: any) {
+      setError(err?.message || 'Không thể tải dữ liệu thời tiết');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadWeather(selectedCity);
+  }, [selectedCity]);
+
+  const handleSelectCity = async (city: City) => {
+    setSelectedCity(city);
+    setLoading(true);
+    await AsyncStorage.setItem(SELECTED_CITY_STORAGE_KEY, JSON.stringify(city));
+    await loadWeather(city);
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.emoji}>🚀</Text>
-          <Text style={styles.title}>Hackathon Starter App</Text>
-          <Text style={styles.subtitle}>
-            Bộ 4 Stack: React Native + Expo + TypeScript + Supabase
-          </Text>
-        </View>
-
-        <View style={styles.stackList}>
-          {stacks.map((item) => (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
+      <View style={styles.background}>
+        {/* Main Content */}
+        {loading && !refreshing && !weatherData ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#38bdf8" />
+            <Text style={styles.loadingMessage}>Đang lấy dự báo thời tiết...</Text>
+          </View>
+        ) : error && !weatherData ? (
+          <View style={styles.centerContainer}>
+            <Ionicons name="cloud-offline-outline" size={60} color="#f87171" />
+            <Text style={styles.errorTitle}>Không thể kết nối</Text>
+            <Text style={styles.errorMessage}>{error}</Text>
             <TouchableOpacity
-              key={item.name}
-              style={styles.card}
-              activeOpacity={0.8}
-              onPress={() => Linking.openURL(item.url)}
+              style={styles.retryBtn}
+              onPress={() => {
+                setLoading(true);
+                loadWeather(selectedCity);
+              }}
             >
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                <View
-                  style={[styles.badge, { backgroundColor: item.color + '22' }]}
-                >
-                  <Text style={[styles.badgeText, { color: item.color }]}>
-                    {item.badge}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.cardDesc}>{item.desc}</Text>
+              <Text style={styles.retryText}>Thử lại</Text>
             </TouchableOpacity>
-          ))}
-        </View>
+          </View>
+        ) : weatherData ? (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#38bdf8"
+                colors={['#38bdf8']}
+              />
+            }
+          >
+            {/* Hero Current Weather */}
+            <CurrentWeatherCard
+              weather={weatherData}
+              onOpenSearch={() => setSearchModalOpen(true)}
+            />
 
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={() => router.push('/(tabs)/two')}
-        >
-          <Text style={styles.ctaButtonText}>
-            👉 Thử nghiệm Supabase Auth & Config
-          </Text>
-        </TouchableOpacity>
+            {/* Hourly Forecast */}
+            <HourlyForecastList hourly={weatherData.hourly} />
+
+            {/* Detailed Metrics */}
+            <WeatherMetricsGrid current={weatherData.current} />
+
+            {/* 7-Day Forecast */}
+            <DailyForecastList daily={weatherData.daily} />
+          </ScrollView>
+        ) : null}
+
+        {/* City Picker Modal */}
+        <CitySearchModal
+          visible={searchModalOpen}
+          onClose={() => setSearchModalOpen(false)}
+          onSelectCity={handleSelectCity}
+        />
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flexGrow: 1,
-  },
-  container: {
+  safeArea: {
     flex: 1,
-    padding: 20,
+    backgroundColor: '#0b1120',
+  },
+  background: {
+    flex: 1,
+    backgroundColor: '#0b1120',
+  },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+  centerContainer: {
+    flex: 1,
     alignItems: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  emoji: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  stackList: {
-    width: '100%',
+    justifyContent: 'center',
+    padding: 24,
     gap: 12,
-    marginVertical: 14,
   },
-  card: {
-    backgroundColor: 'rgba(128, 128, 128, 0.08)',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.15)',
+  loadingMessage: {
+    color: '#94a3b8',
+    fontSize: 15,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-  },
-  cardTitle: {
+  errorTitle: {
+    color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',
+    marginTop: 8,
   },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  cardDesc: {
+  errorMessage: {
+    color: '#94a3b8',
     fontSize: 14,
-    opacity: 0.75,
-    lineHeight: 20,
+    textAlign: 'center',
   },
-  ctaButton: {
-    width: '100%',
-    backgroundColor: '#3ECF8E',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
+  retryBtn: {
+    marginTop: 8,
+    backgroundColor: '#38bdf8',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 20,
   },
-  ctaButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  retryText: {
+    color: '#0b1120',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });

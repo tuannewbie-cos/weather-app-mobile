@@ -1,349 +1,186 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
+  View,
+  Text,
   ScrollView,
-  Platform,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
-import { Text, View } from '@/components/Themed';
-import { supabase } from '@/lib/supabase';
-import { Session } from '@supabase/supabase-js';
+import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { City } from '@/types/weather';
+import { DEFAULT_CITIES, getWeatherCondition } from '@/constants/cities';
 
-export default function SupabaseScreen() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+const SELECTED_CITY_STORAGE_KEY = '@weather_selected_city';
 
-  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-  const isConfigured =
-    supabaseUrl.length > 0 && !supabaseUrl.includes('your-project.supabase.co');
+interface CitySummary {
+  city: City;
+  temp?: number;
+  conditionEmoji?: string;
+  conditionLabel?: string;
+  loading?: boolean;
+}
+
+export default function CitiesScreen() {
+  const router = useRouter();
+  const [citiesData, setCitiesData] = useState<CitySummary[]>(
+    DEFAULT_CITIES.map((c) => ({ city: c, loading: true }))
+  );
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Fetch overview temperatures for each default city
+    (async () => {
+      const updated = await Promise.all(
+        DEFAULT_CITIES.map(async (city) => {
+          try {
+            const res = await fetch(
+              `https://api.open-meteo.com/v1/forecast?latitude=${city.latitude}&longitude=${city.longitude}&current=temperature_2m,weather_code,is_day&timezone=auto`
+            );
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            const cond = getWeatherCondition(data.current.weather_code, data.current.is_day === 1);
+            return {
+              city,
+              temp: Math.round(data.current.temperature_2m),
+              conditionEmoji: cond.emoji,
+              conditionLabel: cond.label,
+              loading: false,
+            };
+          } catch {
+            return {
+              city,
+              temp: undefined,
+              conditionEmoji: '⛅',
+              conditionLabel: 'Có mây',
+              loading: false,
+            };
+          }
+        })
+      );
+      setCitiesData(updated);
+    })();
   }, []);
 
-  async function handleSignIn() {
-    if (!email || !password) {
-      notify('Lỗi', 'Vui lòng nhập email và mật khẩu');
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    setLoading(false);
-    if (error) {
-      notify('Đăng nhập thất bại', error.message);
-    } else {
-      notify('Thành công', 'Đăng nhập thành công!');
-    }
-  }
-
-  async function handleSignUp() {
-    if (!email || !password) {
-      notify('Lỗi', 'Vui lòng nhập email và mật khẩu');
-      return;
-    }
-    setLoading(true);
-    const {
-      data: { session: newSession },
-      error,
-    } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    setLoading(false);
-    if (error) {
-      notify('Đăng ký thất bại', error.message);
-    } else if (!newSession) {
-      notify('Đăng ký thành công', 'Vui lòng kiểm tra email để xác nhận tài khoản!');
-    } else {
-      notify('Thành công', 'Đăng ký và đăng nhập thành công!');
-    }
-  }
-
-  async function handleSignOut() {
-    setLoading(true);
-    await supabase.auth.signOut();
-    setLoading(false);
-    notify('Thông báo', 'Đã đăng xuất');
-  }
-
-  function notify(title: string, message: string) {
-    if (Platform.OS === 'web') {
-      setStatusMessage(`${title}: ${message}`);
-    } else {
-      Alert.alert(title, message);
-    }
-  }
+  const handleSelectCity = async (city: City) => {
+    await AsyncStorage.setItem(SELECTED_CITY_STORAGE_KEY, JSON.stringify(city));
+    router.navigate('/(tabs)');
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
       <View style={styles.container}>
-        <Text style={styles.title}>Supabase Integration</Text>
-        <Text style={styles.subtitle}>React Native + Expo + TypeScript</Text>
-
-        <View style={styles.badgeContainer}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isConfigured ? '#10B981' : '#F59E0B' },
-            ]}
-          />
-          <Text style={styles.badgeText}>
-            {isConfigured
-              ? 'Đã cấu hình Supabase URL'
-              : 'Chưa điền Supabase Key trong file .env'}
-          </Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>Các tỉnh & thành phố</Text>
+          <Text style={styles.subtitle}>Chạm vào một địa điểm để xem chi tiết thời tiết</Text>
         </View>
 
-        {statusMessage && (
-          <View style={styles.messageBox}>
-            <Text style={styles.messageText}>{statusMessage}</Text>
-          </View>
-        )}
-
-        {session && session.user ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Đã đăng nhập 🎉</Text>
-            <Text style={styles.cardSubtitle}>
-              Email: {session.user.email}
-            </Text>
-            <Text style={styles.cardSubtitle}>User ID: {session.user.id}</Text>
-
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {citiesData.map((item) => (
             <TouchableOpacity
-              style={[styles.button, styles.signOutButton]}
-              onPress={handleSignOut}
-              disabled={loading}
+              key={item.city.id}
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() => handleSelectCity(item.city)}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Đăng xuất</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Xác thực (Authentication)</Text>
+              <View style={styles.cityInfoCol}>
+                <Text style={styles.cityName}>{item.city.name}</Text>
+                <Text style={styles.countryName}>{item.city.country}</Text>
+                <Text style={styles.conditionLabel}>{item.conditionLabel || 'Đang cập nhật...'}</Text>
+              </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#888"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Mật khẩu"
-              placeholderTextColor="#888"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.button, styles.primaryButton]}
-                onPress={handleSignIn}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
+              <View style={styles.tempCol}>
+                {item.loading ? (
+                  <ActivityIndicator size="small" color="#38bdf8" />
                 ) : (
-                  <Text style={styles.buttonText}>Đăng nhập</Text>
+                  <>
+                    <Text style={styles.emoji}>{item.conditionEmoji}</Text>
+                    {item.temp !== undefined && <Text style={styles.tempText}>{item.temp}°</Text>}
+                  </>
                 )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.secondaryButton]}
-                onPress={handleSignUp}
-                disabled={loading}
-              >
-                <Text style={styles.secondaryButtonText}>Đăng ký</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.guideCard}>
-          <Text style={styles.guideTitle}>💡 Hướng dẫn cho Hackathon</Text>
-          <Text style={styles.guideItem}>
-            1. Mở file <Text style={styles.codeText}>.env</Text> và điền{' '}
-            <Text style={styles.codeText}>EXPO_PUBLIC_SUPABASE_URL</Text> và{' '}
-            <Text style={styles.codeText}>EXPO_PUBLIC_SUPABASE_ANON_KEY</Text>.
-          </Text>
-          <Text style={styles.guideItem}>
-            2. Import client ở bất kỳ file nào:{' '}
-            <Text style={styles.codeText}>
-              {"import { supabase } from '@/lib/supabase';"}
-            </Text>
-          </Text>
-          <Text style={styles.guideItem}>
-            3. Chạy lệnh <Text style={styles.codeText}>npm start</Text> để mở Expo QR
-            Code và quét bằng Expo Go.
-          </Text>
-        </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0b1120',
   },
   container: {
     flex: 1,
-    padding: 20,
-    alignItems: 'center',
+    backgroundColor: '#0b1120',
+    paddingHorizontal: 16,
+  },
+  header: {
+    marginTop: 16,
+    marginBottom: 20,
+    paddingHorizontal: 4,
   },
   title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginTop: 10,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   subtitle: {
     fontSize: 14,
-    opacity: 0.7,
+    color: '#94a3b8',
     marginTop: 4,
-    marginBottom: 16,
   },
-  badgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(128, 128, 128, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 20,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  badgeText: {
-    fontSize: 12,
+  list: {
+    paddingBottom: 24,
+    gap: 12,
   },
   card: {
-    width: '100%',
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(128, 128, 128, 0.08)',
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    marginBottom: 8,
-    opacity: 0.8,
-  },
-  input: {
-    backgroundColor: 'rgba(128, 128, 128, 0.15)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 8,
-    fontSize: 15,
-    marginBottom: 12,
-    color: '#333',
-  },
-  buttonRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 6,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButton: {
-    backgroundColor: '#3ECF8E', // Supabase Green
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#3ECF8E',
-  },
-  signOutButton: {
-    backgroundColor: '#EF4444',
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  secondaryButtonText: {
-    color: '#3ECF8E',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  messageBox: {
-    width: '100%',
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  messageText: {
-    color: '#2563EB',
-    fontSize: 14,
-  },
-  guideCard: {
-    width: '100%',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
     padding: 18,
-    borderRadius: 12,
-    backgroundColor: 'rgba(128, 128, 128, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  guideTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
+  cityInfoCol: {
+    flex: 1,
   },
-  guideItem: {
+  cityName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  countryName: {
     fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 8,
+    color: '#94a3b8',
+    marginTop: 2,
   },
-  codeText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontWeight: '600',
-    color: '#3ECF8E',
+  conditionLabel: {
+    fontSize: 13,
+    color: '#38bdf8',
+    marginTop: 6,
+    fontWeight: '500',
+  },
+  tempCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  emoji: {
+    fontSize: 28,
+    marginBottom: 2,
+  },
+  tempText: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#ffffff',
   },
 });
